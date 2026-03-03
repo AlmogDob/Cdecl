@@ -195,10 +195,10 @@ cl.exe %CWARN% %CCHECK% %CSTD% "%SRC%" ^
 set "RC=%errorlevel%"
 
 REM Copy ASan runtime DLL if present (path comes from the MSVC env)
-set "ASAN_DLL=%VCToolsInstallDir%bin\Hostx64\x64\clang_rt.asan_dynamic-x86_64.dll"
-if exist "%ASAN_DLL%" (
-  copy /y "%ASAN_DLL%" "%BUILDDIR%" >nul
-)
+REM set "ASAN_DLL=%VCToolsInstallDir%bin\Hostx64\x64\clang_rt.asan_dynamic-x86_64.dll"
+REM if exist "%ASAN_DLL%" (
+REM   copy /y "%ASAN_DLL%" "%BUILDDIR%" >nul
+REM )
 
 if not "%RC%"=="0" (
   endlocal
