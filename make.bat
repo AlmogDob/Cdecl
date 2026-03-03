@@ -13,13 +13,13 @@ REM set "CWARN=%CWARN% /WX"
 
 REM ---- "Checks" equivalents ----
 REM /RTC1 only works with /Od (debug-ish); using /MDd for debug CRT
-set "CCHECK=/Zi /Od /MDd /DDEBUG"
+@REM set "CCHECK=/Zi /Od /MDd /DDEBUG"
 
 REM Optional static analysis (slower)
 REM set "CCHECK=%CCHECK% /analyze"
 
 REM Optional AddressSanitizer (only if your MSVC supports it)
-set "CCHECK=%CCHECK% /fsanitize=address"
+@REM set "CCHECK=%CCHECK% /fsanitize=address"
 
 REM ---- C standard ----
 set "CSTD=/std:c11"
