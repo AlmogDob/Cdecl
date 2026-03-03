@@ -1,6 +1,6 @@
 # What is it
 A command line C declaration parser
-from the 'Expert C Programming - Deep C Secrets' book 
+from the 'Expert C Programming - Deep C Secrets' book Pg.81.
 
 # How to use
 Compile the code:
