@@ -23,7 +23,7 @@ build:
 .PHONY: run 
 run:
 	@$(foreach src,$(SRC_LIST), \
-		echo; echo [INFO] $(BIN_DIR)/$(notdir $(basename $(src))):;  $(BIN_DIR)/$(notdir $(basename $(src))); echo; \
+		echo; echo [INFO] $(BIN_DIR)/$(notdir $(basename $(src))):;  $(BIN_DIR)/$(notdir $(basename $(src))) "$(INPUT)"; echo; \
 	)
 
 .PHONY: clean 

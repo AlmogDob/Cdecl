@@ -1,5 +1,3 @@
-#define ASM_MALLOC
-#define ASM_FREE
 #define ALMOG_STRING_MANIPULATION_IMPLEMENTATION
 #include "Almog_String_Manipulation.h"
 
@@ -64,7 +62,7 @@ enum Type classify_string(void)
 
 char get_char_from_declaration(void)
 {
-    if (declaration_cursor >= asm_length(declaration)) {
+    if (declaration_cursor >= (int)asm_length(declaration)) {
         return '\0';
     }
     return declaration[declaration_cursor++];
@@ -162,7 +160,7 @@ void deal_with_declarator(void)
     /* process tokens that we stacked while reading identifier */
     while (top >= 0) {
         if (stack[top].type == '(') {
-            pop;
+            ASM_UNUSED(pop);
             get_token(); /* read past ')' */
             deal_with_declarator();
         } else {
