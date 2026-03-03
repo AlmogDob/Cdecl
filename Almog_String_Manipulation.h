@@ -1367,8 +1367,8 @@ int asm_strncmp_case_insensitive(const char * const s1, const char * const s2, c
             break;
         }
         if (s1dup[i] != s2dup[i] || (s1dup[i] == '\0') || (s2dup[i] == '\0')) {
-            free(s1dup);
-            free(s2dup);
+            ASM_FREE(s1dup);
+            ASM_FREE(s2dup);
             return 0;
         }
         i++;
