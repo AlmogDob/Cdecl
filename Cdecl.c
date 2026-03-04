@@ -1,3 +1,8 @@
+/**
+ * A command line C declaration parser
+ * from the 'Expert C Programming - Deep C Secrets' book Pg.81.
+ */
+
 #define ASM_MALLOC
 #define ASM_FREE
 #define ALMOG_STRING_MANIPULATION_IMPLEMENTATION
