@@ -174,6 +174,8 @@
  */
 #define asm_max(a, b) ((a) > (b) ? (a) : (b))
 
+#define ASM_UNUSED(x) (void)(x)
+
 bool    asm_check_char_belong_to_base(const char c, const size_t base);
 void    asm_copy_array_by_indexes(char * const target, const int start, const int end, const char * const src);
 int     asm_get_char_value_in_base(const char c, const size_t base);
@@ -195,7 +197,7 @@ bool    asm_isupper(const char c);
 bool    asm_isxdigit(const char c);
 bool    asm_isXdigit(const char c);
 #define asm_length(str) __asm_length(str, __FILE__, __LINE__, __func__)
-size_t  __asm_length(const char * const str, char *file_name, int line_num, char *function_name);
+size_t  __asm_length(const char * const str, char *file_name, int line_num, const char *function_name);
 void *  asm_memset(void * const des, const unsigned char value, const size_t n);
 void    asm_pad_left(char * const s, const size_t padding, const char pad);
 void    asm_print_many_times(const char * const str, const size_t n);
@@ -651,7 +653,7 @@ bool asm_isXdigit(char c)
  *       a null terminator, an error is printed to stderr and __SIZE_MAX__
  *       is returned.
  */
-size_t  __asm_length(const char * const str, char *file_name, int line_num, char *function_name)
+size_t  __asm_length(const char * const str, char *file_name, int line_num, const char *function_name)
 {
     char c;
     size_t i = 0;

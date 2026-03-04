@@ -13,13 +13,13 @@ REM set "CWARN=%CWARN% /WX"
 
 REM ---- "Checks" equivalents ----
 REM /RTC1 only works with /Od (debug-ish); using /MDd for debug CRT
-set "CCHECK=/Zi /Od /MDd /DDEBUG"
+@REM set "CCHECK=/Zi /Od /MDd /DDEBUG"
 
 REM Optional static analysis (slower)
 REM set "CCHECK=%CCHECK% /analyze"
 
 REM Optional AddressSanitizer (only if your MSVC supports it)
-set "CCHECK=%CCHECK% /fsanitize=address"
+@REM set "CCHECK=%CCHECK% /fsanitize=address"
 
 REM ---- C standard ----
 set "CSTD=/std:c11"
@@ -195,10 +195,10 @@ cl.exe %CWARN% %CCHECK% %CSTD% "%SRC%" ^
 set "RC=%errorlevel%"
 
 REM Copy ASan runtime DLL if present (path comes from the MSVC env)
-set "ASAN_DLL=%VCToolsInstallDir%bin\Hostx64\x64\clang_rt.asan_dynamic-x86_64.dll"
-if exist "%ASAN_DLL%" (
-  copy /y "%ASAN_DLL%" "%BUILDDIR%" >nul
-)
+REM set "ASAN_DLL=%VCToolsInstallDir%bin\Hostx64\x64\clang_rt.asan_dynamic-x86_64.dll"
+REM if exist "%ASAN_DLL%" (
+REM   copy /y "%ASAN_DLL%" "%BUILDDIR%" >nul
+REM )
 
 if not "%RC%"=="0" (
   endlocal

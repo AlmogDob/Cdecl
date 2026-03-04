@@ -23,15 +23,11 @@ c is array 0..9 of pointer to function returning pointer to char
 ## On Linux
 In the main directory run:
 ```Shell
-make Cdecl
-```
-And then run:
-```Shell
-./build/Cdecl "your declaration" 
+INPUT="your declaration" make Cdecl
 ```
 For Example:
 ```Shell
-./build/Cdecl "char *(*c[10])(int **p) " 
+INPUT="char *(*c[10])(int **p) " make Cdecl
 declaration = char *(*c[10])(int **p) 
 c is array 0..9 of pointer to function returning pointer to char
 ```
