@@ -1,195 +1,241 @@
-/**
- * A command line C declaration parser
- * from the 'Expert C Programming - Deep C Secrets' book Pg.81.
- */
+#include <ctype.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 
-#define ASM_MALLOC
-#define ASM_FREE
-#define ALMOG_STRING_MANIPULATION_IMPLEMENTATION
-#include "Almog_String_Manipulation.h"
+#define MAXTOKEN 256
+#define MAXOUT 4096
 
-enum Type {
-    IDENTIFIER,
-    QUALIFIER,
-    TYPE,
+enum {
+    NAME,
+    PARENS,
+    BRACKETS,
+    STAR,
+    LPAREN,
+    RPAREN,
+    END
 };
 
-struct Token {
-    char type;
-    char string[ASM_MAX_LEN]; 
-};
+static char token[MAXTOKEN];
+static int tokentype;
+static const char *src;
+static char name[MAXTOKEN];
+static char datatype[MAXTOKEN];
+static char out[MAXOUT];
 
-int top = -1;
-struct Token stack[ASM_MAX_LEN];
-struct Token this;
+static void nexttoken(void) {
+    while (*src == ' ' || *src == '\t') {
+        src++;
+    }
 
-#define pop     stack[top--]
-#define push(s) stack[++top] = (s)
+    if (*src == '\0') {
+        tokentype = END;
+        token[0] = '\0';
+        return;
+    }
 
-char *declaration;
-int declaration_cursor;
+    if (isalpha((unsigned char)*src) || *src == '_') {
+        int i = 0;
+        while (isalnum((unsigned char)*src) || *src == '_') {
+            if (i < MAXTOKEN - 1) {
+                token[i++] = *src;
+            }
+            src++;
+        }
+        token[i] = '\0';
+        tokentype = NAME;
+        return;
+    }
 
-/* figure out the identifier type */
-enum Type classify_string(void)
-{
-    char *s = this.string;
-    if (asm_strncmp(s, "const", asm_length("const"))) {
-        asm_strncpy(s, "read-only", asm_length("read-only"));
-        return QUALIFIER;
-    } else if (asm_strncmp(s, "volatile", asm_length("volatile"))) {
-        return QUALIFIER;
-    } else if (asm_strncmp(s, "void", asm_length("void"))) {
-        return TYPE;
-    } else if (asm_strncmp(s, "char", asm_length("char"))) {
-        return TYPE;
-    } else if (asm_strncmp(s, "signed", asm_length("signed"))) {
-        return TYPE;
-    } else if (asm_strncmp(s, "unsigned", asm_length("unsigned"))) {
-        return TYPE;
-    } else if (asm_strncmp(s, "short", asm_length("short"))) {
-        return TYPE;
-    } else if (asm_strncmp(s, "int", asm_length("int"))) {
-        return TYPE;
-    } else if (asm_strncmp(s, "long", asm_length("long"))) {
-        return TYPE;
-    } else if (asm_strncmp(s, "float", asm_length("float"))) {
-        return TYPE;
-    } else if (asm_strncmp(s, "double", asm_length("double"))) {
-        return TYPE;
-    } else if (asm_strncmp(s, "struct", asm_length("struct"))) {
-        return TYPE;
-    } else if (asm_strncmp(s, "union", asm_length("union"))) {
-        return TYPE;
-    } else if (asm_strncmp(s, "enum", asm_length("enum"))) {
-        return TYPE;
+    if (*src == '(') {
+        if (*(src + 1) == ')') {
+            strcpy(token, "()");
+            src += 2;
+            tokentype = PARENS;
+            return;
+        }
+        token[0] = *src++;
+        token[1] = '\0';
+        tokentype = LPAREN;
+        return;
+    }
+
+    if (*src == ')') {
+        token[0] = *src++;
+        token[1] = '\0';
+        tokentype = RPAREN;
+        return;
+    }
+
+    if (*src == '[') {
+        int i = 0;
+        while (*src != '\0' && *src != ']') {
+            if (i < MAXTOKEN - 1) {
+                token[i++] = *src;
+            }
+            src++;
+        }
+        if (*src == ']' && i < MAXTOKEN - 1) {
+            token[i++] = *src++;
+        }
+        token[i] = '\0';
+        tokentype = BRACKETS;
+        return;
+    }
+
+    if (*src == '*') {
+        token[0] = *src++;
+        token[1] = '\0';
+        tokentype = STAR;
+        return;
+    }
+
+    token[0] = *src++;
+    token[1] = '\0';
+    tokentype = END;
+}
+
+static void append(const char *s) {
+    size_t have = strlen(out);
+    size_t need = strlen(s);
+    if (have + need + 1 < MAXOUT) {
+        strcat(out, s);
+    }
+}
+
+static void dcl(void);
+static void dirdcl(void);
+
+static void parse_param_list(char *buf, size_t bufsz) {
+    int depth = 1;
+    size_t i = 0;
+
+    buf[0] = '\0';
+
+    while (*src != '\0' && depth > 0) {
+        char c = *src++;
+
+        if (c == '(') {
+            depth++;
+        } else if (c == ')') {
+            depth--;
+            if (depth == 0) {
+                break;
+            }
+        }
+
+        if (depth > 0 && i + 1 < bufsz) {
+            buf[i++] = c;
+        }
+    }
+
+    buf[i] = '\0';
+
+    if (depth != 0) {
+        fprintf(stderr, "error: missing ')' in parameter list\n");
+        exit(1);
+    }
+
+    while (i > 0 && isspace((unsigned char)buf[i - 1])) {
+        buf[--i] = '\0';
+    }
+
+    {
+        size_t start = 0;
+        while (isspace((unsigned char)buf[start])) {
+            start++;
+        }
+        if (start > 0) {
+            memmove(buf, buf + start, strlen(buf + start) + 1);
+        }
+    }
+}
+
+static void dcl(void) {
+    int ns = 0;
+
+    while (tokentype == STAR) {
+        ns++;
+        nexttoken();
+    }
+
+    dirdcl();
+
+    while (ns-- > 0) {
+        append("pointer to ");
+    }
+}
+
+static void dirdcl(void) {
+    if (tokentype == LPAREN) {
+        nexttoken();
+        dcl();
+        if (tokentype != RPAREN) {
+            fprintf(stderr, "error: missing ')'\n");
+            exit(1);
+        }
+        nexttoken();
+    } else if (tokentype == NAME) {
+        strncpy(name, token, MAXTOKEN - 1);
+        name[MAXTOKEN - 1] = '\0';
+        nexttoken();
     } else {
-        return IDENTIFIER;
-    }
-}
-
-char get_char_from_declaration(void)
-{
-    if (declaration_cursor >= (int)asm_length(declaration)) {
-        return '\0';
-    }
-    return declaration[declaration_cursor++];
-}
-
-void unget_char_from_declaration(void)
-{
-    declaration_cursor--;
-}
-
-/* read next token into "this" */
-void get_token(void)
-{
-    char *p = this.string;
-
-    /* read past any spaces */
-    while (asm_isspace(*p = get_char_from_declaration())) {
-        ;
-    }
-    if (asm_isalnum(*p)) {
-        /* it starts with A-Z, a-z, 0-9 read in identifier */
-        while (asm_isalnum(*++p = get_char_from_declaration())) ;
-        unget_char_from_declaration();
-        *p = '\0';
-        this.type = (char)classify_string();
-        return;
-    }
-    if (*p == '*') {
-        asm_strncpy(this.string, "pointer to", asm_length("pointer to"));
-        this.type = '*';
-        return;
-    }
-    this.string[1] = '\0';
-    this.type = *p;
-}
-
-/* The piece of code that understand all parsing. */
-void read_to_first_identifier(void)
-{
-    get_token();
-    while (this.type != IDENTIFIER) {
-        push(this);
-        get_token();
-    }
-    printf("%s is ", this.string);
-    get_token();
-}
-
-void deal_with_arrays(void) 
-{
-    while (this.type == '[') {
-        printf("array ");
-        get_token(); /* a number of ']' */
-        if (asm_isdigit(this.string[0])) {
-            printf("0..%d ", asm_str2int(this.string, NULL, 10) - 1);
-            get_token(); /* read the ']' */
-        }
-        get_token(); /* read next past the ']' */
-        printf("of ");
-    }
-}
-
-void deal_with_function_args(void) 
-{
-    while (this.type != ')') {
-        get_token();
-    }
-    get_token();
-    printf("function returning ");
-}
-
-void deal_with_pointers(void)
-{
-    while (stack[top].type == '*') {
-        printf("%s ", pop.string);
-    }
-}
-
-/* deal with possible array/function following identifier */
-void deal_with_declarator(void)
-{
-    switch (this.type) {
-        case '[':
-        {
-            deal_with_arrays();
-        } break;
-        case '(':
-        {
-            deal_with_function_args();
-        } break;
+        fprintf(stderr, "error: expected name or (dcl)\n");
+        exit(1);
     }
 
-    deal_with_pointers();
-
-    /* process tokens that we stacked while reading identifier */
-    while (top >= 0) {
-        if (stack[top].type == '(') {
-            ASM_UNUSED(pop);
-            get_token(); /* read past ')' */
-            deal_with_declarator();
-        } else {
-            printf("%s ", pop.string);
+    while (tokentype == PARENS || tokentype == BRACKETS || tokentype == LPAREN) {
+        if (tokentype == PARENS) {
+            append("function returning ");
+            nexttoken();
+        } else if (tokentype == BRACKETS) {
+            append("array");
+            append(token);
+            append(" of ");
+            nexttoken();
+        } else if (tokentype == LPAREN) {
+            char params[MAXTOKEN];
+            parse_param_list(params, sizeof(params));
+            append("function(");
+            append(params);
+            append(") returning ");
+            nexttoken();
         }
     }
 }
 
-int main(int argc, char const *argv[])
-{
-    if (--argc != 1) {
-        asm_dprintERROR("%s", "not right usage. Usage: 'temp.c' 'declaration'");
+static void parse_datatype(void) {
+    datatype[0] = '\0';
+
+    while (tokentype == NAME) {
+        if (datatype[0] != '\0') {
+            strncat(datatype, " ", MAXTOKEN - strlen(datatype) - 1);
+        }
+        strncat(datatype, token, MAXTOKEN - strlen(datatype) - 1);
+        nexttoken();
+    }
+}
+
+int main(int argc, char **argv) {
+    if (argc != 2) {
+        fprintf(stderr, "usage: %s \"declaration\"\n", argv[0]);
         return 1;
     }
-    declaration_cursor = 0;
-    declaration = (char *)argv[argc--];
 
-    asm_dprintSTRING(declaration);
+    src = argv[1];
+    name[0] = '\0';
+    datatype[0] = '\0';
+    out[0] = '\0';
 
-    read_to_first_identifier();
-    deal_with_declarator();
-    printf("\n");
+    nexttoken();
+    parse_datatype();
+    dcl();
 
+    if (tokentype != END) {
+        fprintf(stderr, "error: unexpected trailing input near '%s'\n", token);
+        return 1;
+    }
+
+    printf("%s is %s%s\n", name, out, datatype);
     return 0;
 }
