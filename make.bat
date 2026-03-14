@@ -11,15 +11,11 @@ set "CWARN=/nologo /W4 /wd4996"
 REM Optional: treat warnings as errors
 REM set "CWARN=%CWARN% /WX"
 
-REM ---- "Checks" equivalents ----
-REM /RTC1 only works with /Od (debug-ish); using /MDd for debug CRT
-@REM set "CCHECK=/Zi /Od /MDd /DDEBUG"
-
-REM Optional static analysis (slower)
-REM set "CCHECK=%CCHECK% /analyze"
-
-REM Optional AddressSanitizer (only if your MSVC supports it)
-@REM set "CCHECK=%CCHECK% /fsanitize=address"
+REM ---- Build mode flags are selected later ----
+REM Debug defaults:
+REM   /Zi /Od /MDd /DDEBUG
+REM Release defaults:
+REM   /O2 /DNDEBUG /MD
 
 REM ---- C standard ----
 set "CSTD=/std:c11"
@@ -35,7 +31,10 @@ REM ============================================================
 set "NOCLEAN=0"
 set "BUILDONLY=0"
 set "CLEANONLY=0"
+set "RELEASE=0"
+set "HELP=0"
 set "FILES="
+set "INPUT_ARG="
 
 :parse
 if "%~1"=="" goto doneparse
@@ -46,6 +45,32 @@ if /i "%~1"=="--build-only" (set "BUILDONLY=1" & shift & goto parse)
 if /i "%~1"=="-b"           (set "BUILDONLY=1" & shift & goto parse)
 if /i "%~1"=="--clean-only" (set "CLEANONLY=1" & shift & goto parse)
 if /i "%~1"=="-c"           (set "CLEANONLY=1" & shift & goto parse)
+if /i "%~1"=="--release"    (set "RELEASE=1"   & shift & goto parse)
+if /i "%~1"=="-r"           (set "RELEASE=1"   & shift & goto parse)
+if /i "%~1"=="--help"       (set "HELP=1"      & shift & goto parse)
+if /i "%~1"=="-h"           (set "HELP=1"      & shift & goto parse)
+if /i "%~1"=="--input" (
+  if "%~2"=="" (
+    set "FAIL_RC=1"
+    set "FAIL_MSG=--input requires an argument."
+    goto fail
+  )
+  set "INPUT_ARG=%~2"
+  shift
+  shift
+  goto parse
+)
+if /i "%~1"=="-i" (
+  if "%~2"=="" (
+    set "FAIL_RC=1"
+    set "FAIL_MSG=-i requires an argument."
+    goto fail
+  )
+  set "INPUT_ARG=%~2"
+  shift
+  shift
+  goto parse
+)
 
 REM Otherwise treat as file
 set "FILES=!FILES! "%~1""
@@ -54,9 +79,29 @@ goto parse
 
 :doneparse
 
+REM ============================================================
+REM Select build mode flags
+REM ============================================================
+if "%RELEASE%"=="1" (
+  set "CCHECK=/O2 /GL /Gy /MT /DNDEBUG /Zi"
+  set "CLINKS=/link /LTCG /OPT:REF /OPT:ICF /DEBUG"
+) else (
+  REM /RTC1 only works with /Od (debug-ish); using /MDd for debug CRT
+  set "CCHECK=/FC /Zi /Od /MDd /DDEBUG /RTC1"
+
+  REM Optional static analysis (slower)
+  REM set "CCHECK=%CCHECK% /analyze"
+
+  REM Optional AddressSanitizer (only if your MSVC supports it)
+  @REM set "CCHECK=%CCHECK% /fsanitize=address"
+)
+
+if "%HELP%"=="1" goto usage
+
 if not defined FILES (
+  goto usage
   set "FAIL_RC=1"
-  set "FAIL_MSG=Usage: %~nx0 <file1.c> [file2.c ...] [--no-clean|-nc] [--build-only|-b] [--clean-only|-c]"
+  set "FAIL_MSG=Usage: %~nx0 <file1.c> [file2.c ...] [--input^|-i ""program args""] [--no-clean^|-nc] [--build-only^|-b] [--clean-only^|-c] [--release^|-r]"
   goto fail
 )
 
@@ -185,7 +230,11 @@ set "SRC=%~1"
 set "NAME=%~n1"
 set "NAME_AND_EXTENSION=%~nx1"
 
-echo [INFO] building:
+if "%RELEASE%"=="1" (
+  echo [INFO] building release:
+) else (
+  echo [INFO] building debug:
+)
 
 cl.exe %CWARN% %CCHECK% %CSTD% "%SRC%" ^
   /Fe:"%BUILDDIR%\%NAME%.exe" ^
@@ -195,10 +244,10 @@ cl.exe %CWARN% %CCHECK% %CSTD% "%SRC%" ^
 set "RC=%errorlevel%"
 
 REM Copy ASan runtime DLL if present (path comes from the MSVC env)
-REM set "ASAN_DLL=%VCToolsInstallDir%bin\Hostx64\x64\clang_rt.asan_dynamic-x86_64.dll"
-REM if exist "%ASAN_DLL%" (
-REM   copy /y "%ASAN_DLL%" "%BUILDDIR%" >nul
-REM )
+set "ASAN_DLL=%VCToolsInstallDir%bin\Hostx64\x64\clang_rt.asan_dynamic-x86_64.dll"
+if exist "%ASAN_DLL%" (
+  copy /y "%ASAN_DLL%" "%BUILDDIR%" >nul
+)
 
 if not "%RC%"=="0" (
   endlocal
@@ -221,20 +270,28 @@ if "%~1"=="" (
 )
 
 set "NAME=%~n1"
-set "EXE=%BUILDDIR%\%NAME%.exe"
+set "EXE=%NAME%.exe"
 
-if not exist "%EXE%" (
+if not exist "%BUILDDIR%\%EXE%" (
   endlocal
   set "FAIL_RC=1"
-  set "FAIL_MSG=run: "%EXE%" not found. Build it first."
+  set "FAIL_MSG=run: "%BUILDDIR%\%EXE%" not found. Build it first."
   exit /b 1
 )
 
 echo [INFO] running "%EXE%"
 echo.
 
-"%EXE%"
+pushd "%BUILDDIR%" || (
+  endlocal
+  set "FAIL_RC=1"
+  set "FAIL_MSG=run: failed to change directory to "%BUILDDIR%"."
+  exit /b 1
+)
+
+call :invoke_exe "%EXE%"
 set "RC=%errorlevel%"
+popd
 
 if not "%RC%"=="0" (
   endlocal
@@ -246,6 +303,14 @@ if not "%RC%"=="0" (
 echo.
 endlocal & exit /b 0
 
+:invoke_exe
+if not defined INPUT_ARG goto invoke_no_arg
+"%~1" "%INPUT_ARG%"
+exit /b %errorlevel%
+
+:invoke_no_arg
+"%~1"
+exit /b %errorlevel%
 
 :clean
 setlocal EnableExtensions
@@ -277,3 +342,15 @@ if not defined FAIL_MSG set "FAIL_MSG=Unknown error."
 1>&2 echo.
 1>&2 echo [ERROR] %FAIL_MSG%
 exit /b %FAIL_RC%
+
+:usage
+echo Usage: %~nx0 ^<file1.c^> [file2.c ...] [options]
+echo.
+echo Options:
+echo   --help, -h           Show this help message
+echo   --input, -i "args"   Pass a single argument string to the program
+echo   --no-clean, -nc      Do not remove build artifacts after running
+echo   --build-only, -b     Build only, do not run
+echo   --clean-only, -c     Remove build artifacts only
+echo   --release, -r        Build in release mode
+exit /b 1
